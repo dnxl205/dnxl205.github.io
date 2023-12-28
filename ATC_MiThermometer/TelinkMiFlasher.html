@@ -1624,6 +1624,36 @@
 					setStatus("Connected.")
 					addLog("Connected.")
 					$("custcfg").innerHTML = '<b>Unknown firmware:</b> Use <a href="https://pvvx.github.io/ATC_MiThermometer/TelinkOTA.html">SDK TelinkOTA</a>';
+
+					//订阅接收UUID
+					gattServer.getPrimaryService('55535343-fe7d-4ae5-8fa9-9fafd205e455')
+						.then(service => {
+							addClog("Found MiMain service");
+							ServiceMain = service;
+							addClog("Check micharacteristics:");
+							return ServiceMain.getCharacteristics();
+						}).then(characteristics => {
+							//micharacteristics = characteristics;
+							for (let i = 0; i < characteristics.length; i++) {
+								addClog(characteristics[i].uuid);
+								if (characteristics[i].uuid == "49535343-1e4d-4bd9-ba61-23c647249616") {
+									ServiceMain.getCharacteristic(characteristics[i].uuid).then(characteristic => {
+										addClog('Found MiTemp characteristic');
+										nitifiyCharTemp = characteristic;
+										nitifiyCharTemp.startNotifications().then(() => {
+											nitifiyCharTemp.addEventListener('characteristicvaluechanged', event => {
+												let value = event.target.value.buffer;
+												let uint8Array = new Uint8Array(value);
+												let hexArray = Array.from(uint8Array, byte => byte.toString(16).padStart(2, '0'));
+												let hexString = hexArray.join(' ');
+												console.log('recv:'+ hexString);
+											});
+										});
+									});
+								}
+							}
+						}).catch(handleError);
+
 				}).catch(error => { addClog(error); });
 			}
 		}

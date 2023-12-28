@@ -129,8 +129,7 @@
 
 		function connect() {
 			var deviceOptions = {
-				optionalServices: ['00001f10-0000-1000-8000-00805f9b34fb', '00010203-0405-0607-0809-0a0b0c0d1912', 'ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6', '22210000-554a-4546-5542-46534450464d', 0x180a, 0x181c, 0x181e, 0xfe95, 0x1f10, 0x1f11, 0x181a, 0xfff9, 0xfdcd, 0xffe0],
-				services: [0x180a, 0x181c, 0x181e, 0xfe95, 0x1f10, 0x1f11, 0x181a, 0xfff9, 0xfdcd, 0xffe0],
+				optionalServices: ['55535343-fe7d-4ae5-8fa9-9fafd205e455'],
 				acceptAllDevices: true
 			};
 			const namePrefix = $('namePrefix').value;
@@ -1612,88 +1611,19 @@
 					gattServer = server;
 					return gattServer.getPrimaryServices();
 				}).then(services => {
-					miEnabled = false;
-					otaEnabled = false;
-					customEnabled = false;
-					devIdEnabled = false;
-					devTest = false;
-					devInfEnabled = false;
-					EnabledQinping = false;
-					for (var i = 0; i < services.length; i++) {
-						addClog("Services: " + services[i].uuid);
-						if (services[i].uuid == "00010203-0405-0607-0809-0a0b0c0d1912") otaEnabled = true;
-						else if (services[i].uuid == "00001f10-0000-1000-8000-00805f9b34fb") customEnabled = true;
-						else if (services[i].uuid == "22210000-554a-4546-5542-46534450464d") EnabledQinping = true;
-						else if (services[i].uuid == "ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6") miEnabled = true;
-						else if (services[i].uuid == "0000181a-0000-1000-8000-00805f9b34fb") devIdEnabled = true;
-						else if (services[i].uuid == "0000ffe0-0000-1000-8000-00805f9b34fb") devTest = true;
-						else if (services[i].uuid == "0000180a-0000-1000-8000-00805f9b34fb") devInfEnabled = true; // Device Information Service
-					}
-					if (otaEnabled)
-						return gattServer.getPrimaryService('00010203-0405-0607-0809-0a0b0c0d1912');
-					else {
-						addAlog("Not found Telink OTA service!");
-					}
 					connectTrys = 1000;
-					return resolve(null);
+					return gattServer.getPrimaryService('55535343-fe7d-4ae5-8fa9-9fafd205e455');
 				}).then(service => {
 					addClog("Found Telink OTA service");
 					Theservice = service;
-					return Theservice.getCharacteristic('00010203-0405-0607-0809-0a0b0c0d2b12');
+					return Theservice.getCharacteristic('49535343-8841-43f4-a8d4-ecbe34729bb3');
 				}).then(characteristic => {
 					addClog("Found Telink OTA write characteristic");
 					writeCharacteristic = characteristic;
 
-					getDevVersion(devInfEnabled).then(_ => {
-						if (devinfo.hrstr) addLog('Hardware Revision String: ' + devinfo.hrstr);
-						if (devinfo.srstr) addLog('Software Revision String: ' + devinfo.srstr);
-						if (devinfo.frstr) addLog('Firmware Revision String: ' + devinfo.frstr);
-						if (miEnabled) {
-							addLog("Detected Mi device");
-							setStatus("Detected Mi device");
-							$("custcfg").innerHTML = '<hr>When doing an activation here the device is needed to be activated in the Mi app again when wanted to use there.<br><button type="button" onclick="sendRegister();">Do Activation</button> <button type="button" onclick="keyMiLogin();">Login</button><br>Device known id:<br><input size="40" type="text" id="known_id" value=""><br>Mi Token:<br><input size="40" type="text" id="mi_token" value=""><br>Mi Bind Key:<br><input size="40" type="text" id="mi_bind_key" value=""><br><br>';
-							if (bluetoothDevice.name.substr(0, 10) == "MJWSD05MMC") fwmaxsize = 0x34000;
-							if ((bluetoothDevice.name.substr(0, 10) == "LYWSD03MMC") && (devinfo.frstr.substr(0, 2) == "2.")) {
-								s = "(!) Version: " + devinfo.frstr + " is temporarily not supported (!)";
-								addLog(s);
-								connectTrys = 1000;
-								disconnect();
-							} else
-								miAction();
-						} else if (customEnabled) {
-							let s = '<button type="button" onclick="sendCustomSetting(&quot;55&quot;);">Get Config</button><br>Send commands to custom firmware:<br><input type="text" id="cmdTXT" value=""><button type="button" onclick="sendCustomSetting($(&quot;cmdTXT&quot;).value,settingsCharacteristics);">Send</button><br>';
-							if (devTest) {
-								addLog("Detected Test device");
-								setStatus("Detected Test device");
-								getTestCharacteristic();
-								s += '<a href="https://pvvx.github.io/ATC_MiThermometer/TelinkOTA.html">TelinkOTA</a><br>';
-							} else {
-								addLog("Detected custom Firmware");
-								setStatus("Detected custom Firmware");
-								customAction();
-							}
-							$("custcfg").innerHTML = s;
-						} else if (EnabledQinping) {
-							if (bluetoothDevice.name.substr(0, 15) == "Qingping Motion")
-								CGPR1_Action();
-							else if (bluetoothDevice.name.substr(0, 21) == "Qingping Temp RH Lite")
-								CGDK2_Action();
-							else if (bluetoothDevice.name.substr(0, 20) == "Qingping Temp & RH M")
-								CGG1_Action("2020-2021");
-							else if (bluetoothDevice.name.substr(0, 18) == "Qingping Temp RH M")
-								CGG1_Action("2022");
-							else
-								addLog("Unknown Qingping Firmware");
-							setStatus("Unknown Qingping Firmware");
-						} else {
-							setStatus("Connected.")
-							$("custcfg").innerHTML = '<b>Unknown firmware:</b> Use <a href="https://pvvx.github.io/ATC_MiThermometer/TelinkOTA.html">SDK TelinkOTA</a>';
-							/*			miEnabled = true;
-										miAuthorization();	//	miConnected
-										$("ldfile").hidden = false;
-										$("custcfg").innerHTML = '<hr>When doing an activation here the device is needed to be activated in the Mi app again when wanted to use there.<br><button type="button" onclick="sendRegister();">Do Activation</button> <button type="button" onclick="skipActivation();">Skip Activation</button>	 <button type="button" onclick="keyMiLogin();">Login</button><br>Device known id:<br><input size="40" type="text" id="known_id" value=""><br>Mi Token:<br><input size="40" type="text" id="mi_token" value=""><br>Mi Bind Key:<br><input size="40" type="text" id="mi_bind_key" value=""><br><br>'; */
-						}
-					}).catch(handleError);
+					setStatus("Connected.")
+					addLog("Connected.")
+					$("custcfg").innerHTML = '<b>Unknown firmware:</b> Use <a href="https://pvvx.github.io/ATC_MiThermometer/TelinkOTA.html">SDK TelinkOTA</a>';
 				}).catch(error => { addClog(error); });
 			}
 		}
@@ -2961,7 +2891,7 @@
 		<label for="advmac">Get Advertising MAC</label>
 		<br>
 		<label for="namePrefix">BLE device name prefix filter(s)</label>
-		<input type="text" id="namePrefix" value="" placeholder="LYWSD03,ATC"><br>
+		<input type="text" id="namePrefix" value="" placeholder="ai-thinker,ATC"><br>
 		<button type="button" onclick="connect();">Connect</button>
 		<button type="button" onclick="disconnect();">Disconnect</button>
 		<button type="button" onclick="reConnect();">Reconnect</button><br>

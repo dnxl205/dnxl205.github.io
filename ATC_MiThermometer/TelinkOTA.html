@@ -139,7 +139,7 @@
                                         otaCharSend(string).then(function(){
                                             setTimeout(function(){
                                                 if(ota_step <= 2){
-                                                    ota_step = 0;
+                                                    //ota_step = 0;
                                                     console.log('timeout');
                                                 }
                                             }, 3000);
@@ -184,7 +184,7 @@
                                             otaCharSend(string).then(function(){
                                                 setTimeout(function(){
                                                     if(ota_step <= 4){
-                                                        ota_step = 0;
+                                                        //ota_step = 0;
                                                         console.log('timeout');
                                                     }
                                                 }, 3000);
@@ -202,19 +202,23 @@
                                         addLog("ota_step: 5");
                                         ota_step = 5;
 
+                                        addLog("reset mcu");
+
                                         var data = new Uint8Array(3);
                                         data[0] = 0x01;
                                         data[1] = 0x01;
                                         data[2] = 0x01;
                                         var string = get_packet_body(0, 0, 0, 0, 0x06, data);
-                                        otaCharSend(string).then(function(){
+                                        setTimeout(function(){
+                                            otaCharSend(string).then(function(){
                                             setTimeout(function(){
                                                 if(ota_step <= 5){
-                                                    ota_step = 0;
+                                                    //ota_step = 0;
                                                     console.log('timeout');
                                                 }
                                             }, 3000);
                                         });
+                                        }, 3000);
                                     }
                                 }
 
@@ -230,7 +234,7 @@
                                         otaCharSend(string).then(function(){
                                             setTimeout(function(){
                                                 if(ota_step <= 6){
-                                                    ota_step = 0;
+                                                    //ota_step = 0;
                                                     console.log('timeout');
                                                 }
                                             }, 3000);
@@ -482,7 +486,7 @@
             otaCharSend(string).then(function(){
                 setTimeout(function(){
                     if(ota_step <= 1){
-                        ota_step = 0;
+                        //ota_step = 0;
                         console.log('timeout');
                     }
                 }, 3000);

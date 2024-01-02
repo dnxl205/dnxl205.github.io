@@ -126,7 +126,7 @@
                                         addLog("cur_progress" + cur_progress);
 
                                         //第二步：发送【固件长度】指令
-                                        addLog("ota_step: 2");
+                                        addLog("ota_step 2: Start write firmware");
                                         ota_step = 2;
 
                                         var data = new Uint8Array(5);
@@ -151,7 +151,7 @@
                                     if(uint8Array[8] == 0x7c || uint8Array[8] == 0x79){
                                         if(ota_step == 2){
                                             blockNr = 0;
-                                            addLog("ota_step: 3");
+                                            addLog("ota_step 3: Writing firmware");
                                         } 
                                         else{
                                             blockNr = blockNr + 1;
@@ -173,7 +173,7 @@
                                             cur_progress = 100;
 
                                             //第四步：发送【固件结束】指令
-                                            addLog("ota_step: 4");
+                                            addLog("ota_step 4: Write firmware end");
                                             ota_step = 4;
 
                                             var data = new Uint8Array(3);
@@ -199,10 +199,8 @@
                                 else if(ota_step == 4){
                                     if(uint8Array[8] == 0x7f){
                                         //第五步：发送【程序复位】指令
-                                        addLog("ota_step: 5");
+                                        addLog("ota_step 5: Reset");
                                         ota_step = 5;
-
-                                        addLog("reset mcu");
 
                                         var data = new Uint8Array(3);
                                         data[0] = 0x01;
@@ -225,7 +223,7 @@
                                 else if(ota_step == 5){
                                     if(uint8Array[8] == 0x1f){
                                         //第六步：发送【获取状态】指令
-                                        addLog("ota_step: 6");
+                                        addLog("ota_step 6: Get status");
                                         ota_step = 6;
 
                                         var data = new Uint8Array(1);
@@ -476,7 +474,7 @@
             }
 
             //第一步：发送【擦除固件】指令
-            addLog("ota_step: 1");
+            addLog("ota_step 1: Erase firmware");
             ota_step = 1;
 
             var data = new Uint8Array(2);

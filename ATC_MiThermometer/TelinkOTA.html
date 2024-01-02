@@ -22,6 +22,7 @@
         var connectTrys = 0;
         var ota_step = 0;
         var firmwareSize = 0;
+        var frameArray = null;    //粘包数组
 
         var $ = function (id) { return document.getElementById(id); }
 
@@ -111,6 +112,30 @@
                         nitifiyCharTemp.addEventListener('characteristicvaluechanged', event => {
                             let value = event.target.value.buffer;
                             let uint8Array = new Uint8Array(value);
+
+                            //帧头
+                            if(uint8Array.length >= 2 && uint8Array[0] == 0xaa && uint8Array[1] == 0x55){
+                                //数据不足，保留数据，退出
+                                if(uint8Array.length < 8 || uint8Array.length < (8 + uint8Array[7] + 4)){
+                                    frameArray = null; 
+                                    frameArray = new Uint8Array(uint8Array);
+                                    return;
+                                }
+                            }
+                            //帧尾
+                            else if(frameArray != null){
+                                var combinedData = new Uint8Array(frameArray.length + uint8Array.length);
+                                combinedData.set(frameArray, 0);
+                                combinedData.set(uint8Array, frameArray.length);
+                                frameArray = combinedData;
+                                uint8Array = combinedData;
+                                
+                                //未接收完成
+                                if(frameArray.length < 8 || frameArray.length < (8 + frameArray[7] + 4)){
+                                    return;
+                                }
+                            }
+                            frameArray = null;
 
                             let hexArray = Array.from(uint8Array, byte => byte.toString(16).padStart(2, '0'));
                             let hexString = hexArray.join('');
@@ -221,7 +246,7 @@
                                 }
 
                                 else if(ota_step == 5){
-                                    if(uint8Array[8] == 0x1f){
+                                    if(uint8Array[8] == 0x79){
                                         //第六步：发送【获取状态】指令
                                         addLog("ota_step 6: Get status");
                                         ota_step = 6;

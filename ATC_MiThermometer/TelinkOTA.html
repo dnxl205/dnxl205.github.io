@@ -86,6 +86,92 @@
             }).catch(handleError);
         }
 
+        function bleSend(step){
+            if(step == 1){
+                var data = new Uint8Array(2);
+                data[0] = 0x03;
+                data[1] = 0x01;
+                var string = get_packet_body(0, 0, 0, 0, 0x02, data);
+                otaCharSend(string).then(function(){
+                    setTimeout(function(){
+                        if(ota_step <= 1){
+                            //ota_step = 0;
+                            console.log('timeout');
+                        }
+                    }, 3000);
+                });
+            }
+            else if(step == 2){
+                var data = new Uint8Array(5);
+                data[0] = 0x03;
+                data[1] = firmwareSize;
+                data[2] = firmwareSize >> 8;
+                data[3] = firmwareSize >> 16;
+                data[4] = firmwareSize >> 24;
+                var string = get_packet_body(0, 0, 0, 0, 0x03, data);
+                otaCharSend(string).then(function(){
+                    setTimeout(function(){
+                        if(ota_step <= 2){
+                            //ota_step = 0;
+                            console.log('timeout');
+                        }
+                    }, 3000);
+                });
+            }
+            else if(step == 3){
+                var data = firmwareArray.substring(blockNr * 384, blockNr * 384 + 384);
+                var dataArray = Array.from(new Uint8Array(data.match(/.{1,2}/g).map(byte => parseInt(byte, 16))));
+                var string = get_packet_body(0, 0, 0, 0, 0x04, dataArray);
+                setTimeout(function(){
+                    otaCharSend(string);
+                }, 20);
+            }
+            else if(step == 4){
+                var data = new Uint8Array(3);
+                data[0] = 0x06;
+                data[1] = 0x01;
+                data[2] = 0x01;
+                var string = get_packet_body(0, 0, 0, 0, 0x05, data);
+                otaCharSend(string).then(function(){
+                    setTimeout(function(){
+                        if(ota_step <= 4){
+                            //ota_step = 0;
+                            console.log('timeout');
+                        }
+                    }, 3000);
+                });
+            }
+            else if(step == 5){
+                var data = new Uint8Array(3);
+                data[0] = 0x01;
+                data[1] = 0x01;
+                data[2] = 0x01;
+                var string = get_packet_body(0, 0, 0, 0, 0x06, data);
+                setTimeout(function(){
+                    otaCharSend(string).then(function(){
+                    setTimeout(function(){
+                        if(ota_step <= 5){
+                            //ota_step = 0;
+                            console.log('timeout');
+                        }
+                    }, 3000);
+                });
+                }, 3000);
+            }
+            else if(step == 6){
+                var data = new Uint8Array(1);
+                data[0] = 0x00;
+                var string = get_packet_body(0, 0, 0, 0, 0x01, data);
+                otaCharSend(string).then(function(){
+                    setTimeout(function(){
+                        if(ota_step <= 6){
+                            //ota_step = 0;
+                            console.log('timeout');
+                        }
+                    }, 3000);
+                });
+            }
+        }
 
         function doConnect() {
             bluetoothDevice.gatt.connect().then(server => {
@@ -153,22 +239,7 @@
                                         //第二步：发送【固件长度】指令
                                         addLog("ota_step 2: Start write firmware");
                                         ota_step = 2;
-
-                                        var data = new Uint8Array(5);
-                                        data[0] = 0x03;
-                                        data[1] = firmwareSize;
-                                        data[2] = firmwareSize >> 8;
-                                        data[3] = firmwareSize >> 16;
-                                        data[4] = firmwareSize >> 24;
-                                        var string = get_packet_body(0, 0, 0, 0, 0x03, data);
-                                        otaCharSend(string).then(function(){
-                                            setTimeout(function(){
-                                                if(ota_step <= 2){
-                                                    //ota_step = 0;
-                                                    console.log('timeout');
-                                                }
-                                            }, 3000);
-                                        });
+                                        bleSend(ota_step);
                                     }
                                 }
 
@@ -187,12 +258,7 @@
                                         cur_progress = (blockNr * 192) /  firmwareSize * 100;
                                         if(cur_progress < 100){
                                             //第三步：发送【固件数据】指令
-                                            var data = firmwareArray.substring(blockNr * 384, blockNr * 384 + 384);
-                                            var dataArray = Array.from(new Uint8Array(data.match(/.{1,2}/g).map(byte => parseInt(byte, 16))));
-                                            var string = get_packet_body(0, 0, 0, 0, 0x04, dataArray);
-                                            setTimeout(function(){
-                                                otaCharSend(string);
-                                            }, 20);
+                                            bleSend(ota_step);
                                         }
                                         else{
                                             cur_progress = 100;
@@ -200,20 +266,7 @@
                                             //第四步：发送【固件结束】指令
                                             addLog("ota_step 4: Write firmware end");
                                             ota_step = 4;
-
-                                            var data = new Uint8Array(3);
-                                            data[0] = 0x06;
-                                            data[1] = 0x01;
-                                            data[2] = 0x01;
-                                            var string = get_packet_body(0, 0, 0, 0, 0x05, data);
-                                            otaCharSend(string).then(function(){
-                                                setTimeout(function(){
-                                                    if(ota_step <= 4){
-                                                        //ota_step = 0;
-                                                        console.log('timeout');
-                                                    }
-                                                }, 3000);
-                                            });
+                                            bleSend(ota_step);
                                         }
                                         $("log").innerHTML = "";
                                         addLog('cur_progress: ' + cur_progress.toFixed(1) + ' %');
@@ -226,22 +279,7 @@
                                         //第五步：发送【程序复位】指令
                                         addLog("ota_step 5: Reset");
                                         ota_step = 5;
-
-                                        var data = new Uint8Array(3);
-                                        data[0] = 0x01;
-                                        data[1] = 0x01;
-                                        data[2] = 0x01;
-                                        var string = get_packet_body(0, 0, 0, 0, 0x06, data);
-                                        setTimeout(function(){
-                                            otaCharSend(string).then(function(){
-                                            setTimeout(function(){
-                                                if(ota_step <= 5){
-                                                    //ota_step = 0;
-                                                    console.log('timeout');
-                                                }
-                                            }, 3000);
-                                        });
-                                        }, 3000);
+                                        bleSend(ota_step);
                                     }
                                 }
 
@@ -250,18 +288,7 @@
                                         //第六步：发送【获取状态】指令
                                         addLog("ota_step 6: Get status");
                                         ota_step = 6;
-
-                                        var data = new Uint8Array(1);
-                                        data[0] = 0x00;
-                                        var string = get_packet_body(0, 0, 0, 0, 0x01, data);
-                                        otaCharSend(string).then(function(){
-                                            setTimeout(function(){
-                                                if(ota_step <= 6){
-                                                    //ota_step = 0;
-                                                    console.log('timeout');
-                                                }
-                                            }, 3000);
-                                        });
+                                        bleSend(ota_step);
                                     }
                                 }
                             }
@@ -501,19 +528,7 @@
             //第一步：发送【擦除固件】指令
             addLog("ota_step 1: Erase firmware");
             ota_step = 1;
-
-            var data = new Uint8Array(2);
-            data[0] = 0x03;
-            data[1] = 0x01;
-            var string = get_packet_body(0, 0, 0, 0, 0x02, data);
-            otaCharSend(string).then(function(){
-                setTimeout(function(){
-                    if(ota_step <= 1){
-                        //ota_step = 0;
-                        console.log('timeout');
-                    }
-                }, 3000);
-            });
+            bleSend(ota_step);
 
             // setTimeout(function() {
             //     otaCharSend("00ff").then(function(character) {

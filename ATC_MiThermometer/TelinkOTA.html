@@ -23,6 +23,9 @@
         var ota_step = 0;
         var firmwareSize = 0;
         var frameArray = null;    //粘包数组
+        let timeoutTimer = null;  //超时定时器
+        var timeoutCnt = 0;       //超时计数
+        var timeoutTimes = 0;     //超时次数
 
         var $ = function (id) { return document.getElementById(id); }
 
@@ -92,14 +95,7 @@
                 data[0] = 0x03;
                 data[1] = 0x01;
                 var string = get_packet_body(0, 0, 0, 0, 0x02, data);
-                otaCharSend(string).then(function(){
-                    setTimeout(function(){
-                        if(ota_step <= 1){
-                            //ota_step = 0;
-                            console.log('timeout');
-                        }
-                    }, 3000);
-                });
+                otaCharSend(string);
             }
             else if(step == 2){
                 var data = new Uint8Array(5);
@@ -109,14 +105,7 @@
                 data[3] = firmwareSize >> 16;
                 data[4] = firmwareSize >> 24;
                 var string = get_packet_body(0, 0, 0, 0, 0x03, data);
-                otaCharSend(string).then(function(){
-                    setTimeout(function(){
-                        if(ota_step <= 2){
-                            //ota_step = 0;
-                            console.log('timeout');
-                        }
-                    }, 3000);
-                });
+                otaCharSend(string);
             }
             else if(step == 3){
                 var data = firmwareArray.substring(blockNr * 384, blockNr * 384 + 384);
@@ -132,14 +121,7 @@
                 data[1] = 0x01;
                 data[2] = 0x01;
                 var string = get_packet_body(0, 0, 0, 0, 0x05, data);
-                otaCharSend(string).then(function(){
-                    setTimeout(function(){
-                        if(ota_step <= 4){
-                            //ota_step = 0;
-                            console.log('timeout');
-                        }
-                    }, 3000);
-                });
+                otaCharSend(string);
             }
             else if(step == 5){
                 var data = new Uint8Array(3);
@@ -148,28 +130,14 @@
                 data[2] = 0x01;
                 var string = get_packet_body(0, 0, 0, 0, 0x06, data);
                 setTimeout(function(){
-                    otaCharSend(string).then(function(){
-                    setTimeout(function(){
-                        if(ota_step <= 5){
-                            //ota_step = 0;
-                            console.log('timeout');
-                        }
-                    }, 3000);
-                });
+                    otaCharSend(string);
                 }, 3000);
             }
             else if(step == 6){
                 var data = new Uint8Array(1);
                 data[0] = 0x00;
                 var string = get_packet_body(0, 0, 0, 0, 0x01, data);
-                otaCharSend(string).then(function(){
-                    setTimeout(function(){
-                        if(ota_step <= 6){
-                            //ota_step = 0;
-                            console.log('timeout');
-                        }
-                    }, 3000);
-                });
+                otaCharSend(string);
             }
         }
 
@@ -233,6 +201,8 @@
                             if (got_crc.toLowerCase() === tag_crc.toLowerCase()){
                                 if(ota_step == 1){
                                     if(uint8Array[8] == 0x7c){
+                                        timeoutCnt = 0; //超时计数清零
+
                                         cur_progress = 0;
                                         addLog("cur_progress" + cur_progress);
 
@@ -245,6 +215,8 @@
 
                                 else if(ota_step == 2 || ota_step == 3){
                                     if(uint8Array[8] == 0x7c || uint8Array[8] == 0x79){
+                                        timeoutCnt = 0; //超时计数清零
+
                                         if(ota_step == 2){
                                             blockNr = 0;
                                             addLog("ota_step 3: Writing firmware");
@@ -276,6 +248,8 @@
 
                                 else if(ota_step == 4){
                                     if(uint8Array[8] == 0x7f){
+                                        timeoutCnt = 0; //超时计数清零
+
                                         //第五步：发送【程序复位】指令
                                         addLog("ota_step 5: Reset");
                                         ota_step = 5;
@@ -285,11 +259,17 @@
 
                                 else if(ota_step == 5){
                                     if(uint8Array[8] == 0x79){
+                                        timeoutCnt = 0; //超时计数清零
+
                                         //第六步：发送【获取状态】指令
                                         addLog("ota_step 6: Get status");
                                         ota_step = 6;
                                         bleSend(ota_step);
                                     }
+                                }else if(ota_step == 6){
+                                    ota_step = 0;
+                                    timeoutCnt = 0;
+                                    clearTimeout(timeoutTimer);
                                 }
                             }
                         });
@@ -529,6 +509,34 @@
             addLog("ota_step 1: Erase firmware");
             ota_step = 1;
             bleSend(ota_step);
+
+            timeoutCnt = 0;
+            timeoutTimes = 0;
+            
+            if(timeoutTimer) clearTimeout(timeoutTimer);
+            timeoutTimer = setInterval(function() {
+                timeoutCnt = timeoutCnt + 1;
+
+                var times = 0;
+                if(ota_step == 5)
+                    times = 10;
+                else
+                    times = 4;
+
+                if(timeoutCnt > times){
+                    timeoutCnt = 0;
+
+                    if(timeoutTimes < 3){
+                        timeoutTimes = timeoutTimes + 1;
+                        console.log('resend');
+                        bleSend(ota_step);
+                    }else{
+                        timeoutTimes = 0;
+                        console.log('timeout');
+                        clearTimeout(timeoutTimer);
+                    }
+                }
+            }, 500);
 
             // setTimeout(function() {
             //     otaCharSend("00ff").then(function(character) {

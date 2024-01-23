@@ -59,23 +59,25 @@
 		function getFirmwareArray(data, filename) {
             firmwareArray = bytesToHex(data);
             firmwareSize = firmwareArray.length / 2;
+            addLog("File: " + filename);
+            addLog("File was selected, size: " + firmwareSize + " bytes");
 
-            if(firmwareSize > 0){
-                xmlResendCnt = 0;
+            // if(firmwareSize > 0){
+            //     xmlResendCnt = 0;
 
-                addLog("File: " + filename);
-                addLog("File was selected, size: " + firmwareSize + " bytes");
-            }else{
-                xmlResendCnt = xmlResendCnt + 1;
+            //     addLog("File: " + filename);
+            //     addLog("File was selected, size: " + firmwareSize + " bytes");
+            // }else{
+            //     xmlResendCnt = xmlResendCnt + 1;
 
-                if(xmlResendCnt <= 3){
-                    addLog("xml resend : " + xmlResendCnt);
-                    ajax_file('m001L.bin', getFirmwareArray);
-                }else{
-                    xmlResendCnt = 0;
-                    addLog("xml send fail");
-                }
-            }
+            //     if(xmlResendCnt <= 3){
+            //         addLog("xml resend : " + xmlResendCnt);
+            //         ajax_file('m001L.bin', getFirmwareArray);
+            //     }else{
+            //         xmlResendCnt = 0;
+            //         addLog("xml send fail");
+            //     }
+            // }
 		}
 
 		function ajax_file(filename, fn, rawurl = "https://raw.githubusercontent.com/dnxl205/dnxl205.github.io/main/ATC_MiThermometer/") {
@@ -325,15 +327,15 @@
                                                 addLog("Device: M002");
                                                 ajax_file('m101.bin', getFirmwareArray);
                                             }
-
-                                            ota_step = 0;
-                                            timeoutCnt = 0;
-                                            clearTimeout(timeoutTimer);
                                         }
                                         else
                                         {
                                             addLog("OTA finish");
                                         }
+
+                                        ota_step = 0;
+                                        timeoutCnt = 0;
+                                        clearTimeout(timeoutTimer);
                                     }
                                 }
                             }

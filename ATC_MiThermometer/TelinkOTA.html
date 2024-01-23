@@ -114,8 +114,6 @@
                 bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
                 addLog("Connecting to: " + bluetoothDevice.name);
                 doConnect();
-
-                //ajax_file('m001L.bin', getFirmwareArray);
             }).catch(handleError);
         }
 
@@ -297,6 +295,24 @@
                                         bleSend(ota_step);
                                     }
                                 }else if(ota_step == 6){
+                                    if(cur_progress < 100)
+                                    {
+                                        //M001L&P
+                                        if(uint8Array[14] == 11 || uint8Array[14] == 12){
+                                            addLog("Device: M001L&P");
+                                            ajax_file('m001L.bin', getFirmwareArray);
+                                        }
+                                        //M101
+                                        else if(uint8Array[14] == 101){
+                                            addLog("Device: M002");
+                                            ajax_file('m101.bin', getFirmwareArray);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        addLog("OTA finish");
+                                    }
+
                                     ota_step = 0;
                                     timeoutCnt = 0;
                                     clearTimeout(timeoutTimer);
@@ -305,6 +321,15 @@
                         });
                     });
                 });
+
+                setTimeout(function () {
+                    //发送【获取设备】指令
+                    addLog("Get Device");
+                    ota_step = 6;
+                    bleSend(ota_step);
+
+                    setTimer();
+                }, 1000);
             }).catch(handleError);
         }
 
@@ -529,17 +554,7 @@
             return string;
         }
 
-        function updateBegin() {
-            if (firmwareSize <= 0) {
-                addLog("No file selected aborting");
-                return;
-            }
-
-            //第一步：发送【擦除固件】指令
-            addLog("ota_step 1: Erase firmware");
-            ota_step = 1;
-            bleSend(ota_step);
-
+        function setTimer(){
             timeoutCnt = 0;
             timeoutTimes = 0;
             
@@ -567,6 +582,20 @@
                     }
                 }
             }, 500);
+        }
+
+        function updateBegin() {
+            if (firmwareSize <= 0) {
+                addLog("No file selected aborting");
+                return;
+            }
+
+            //第一步：发送【擦除固件】指令
+            addLog("ota_step 1: Erase firmware");
+            ota_step = 1;
+            bleSend(ota_step);
+
+            setTimer();
 
             // setTimeout(function() {
             //     otaCharSend("00ff").then(function(character) {

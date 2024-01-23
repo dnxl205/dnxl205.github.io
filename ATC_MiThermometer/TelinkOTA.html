@@ -57,13 +57,13 @@
         }
 
 		function getFirmwareArray(data, filename) {
+            firmwareArray = bytesToHex(data);
             firmwareSize = firmwareArray.length / 2;
 
             if(firmwareSize > 0){
                 xmlResendCnt = 0;
 
                 addLog("File: " + filename);
-                firmwareArray = bytesToHex(data);
                 addLog("File was selected, size: " + firmwareSize + " bytes");
             }else{
                 xmlResendCnt = xmlResendCnt + 1;
@@ -94,7 +94,7 @@
 			xhr.ontimeout = function () { addLog('XMLHttpRequest: timeout'); fn(); };
 			xhr.onerror = function () { addLog('XMLHttpRequest error!'); fn(); };
 			xhr.open('GET', rawurl + filename, true);
-			xhr.timeout = 3000;
+			xhr.timeout = 5000;
 			xhr.responseType = "arraybuffer";
 			xhr.send();
 		}
@@ -312,27 +312,29 @@
                                         bleSend(ota_step);
                                     }
                                 }else if(ota_step == 6){
-                                    if(cur_progress < 100)
-                                    {
-                                        //M001L&P
-                                        if(uint8Array[14] == 11 || uint8Array[14] == 12){
-                                            addLog("Device: M001L&P");
-                                            ajax_file('m001L.bin', getFirmwareArray);
-                                        }
-                                        //M101
-                                        else if(uint8Array[14] == 101){
-                                            addLog("Device: M002");
-                                            ajax_file('m101.bin', getFirmwareArray);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        addLog("OTA finish");
-                                    }
+                                    if(uint8Array[8] == 0x79){
+                                        if(cur_progress < 100)
+                                        {
+                                            //M001L&P
+                                            if(uint8Array[14] == 11 || uint8Array[14] == 12){
+                                                addLog("Device: M001L&P");
+                                                ajax_file('m001L.bin', getFirmwareArray);
+                                            }
+                                            //M101
+                                            else if(uint8Array[14] == 101){
+                                                addLog("Device: M002");
+                                                ajax_file('m101.bin', getFirmwareArray);
+                                            }
 
-                                    ota_step = 0;
-                                    timeoutCnt = 0;
-                                    clearTimeout(timeoutTimer);
+                                            ota_step = 0;
+                                            timeoutCnt = 0;
+                                            clearTimeout(timeoutTimer);
+                                        }
+                                        else
+                                        {
+                                            addLog("OTA finish");
+                                        }
+                                    }
                                 }
                             }
                         });

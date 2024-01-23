@@ -54,6 +54,34 @@
             addLog('Disconnected.');
         }
 
+		function getFirmwareArray(data, filename) {
+			addLog("File: " + filename);
+			firmwareArray = bytesToHex(data);
+            firmwareSize = firmwareArray.length / 2;
+            addLog("File was selected, size: " + firmwareSize + " bytes");
+		}
+
+		function ajax_file(filename, fn, rawurl = "https://raw.githubusercontent.com/dnxl205/dnxl205.github.io/main/ATC_MiThermometer/") {
+			let xhr;
+			if (window.XMLHttpRequest) xhr = new XMLHttpRequest();
+			else if (window.ActiveXObject) xhr = new ActiveXObject("Microsoft.XMLHTTP")
+			if (!xhr) { addLog(msg("Your browser does not support AJAX!")); fn(); return; };
+			xhr.onreadystatechange = function () {
+				if (xhr.readyState == 4) {
+					if (xhr.status == 200) fn(xhr.response, filename);
+					else { addLog('XMLHttpRequest: response ' + xhr.status); fn(); }
+					xhr.abort();
+					xhr = null;
+				}
+			};
+			xhr.ontimeout = function () { addLog('XMLHttpRequest: timeout'); fn(); };
+			xhr.onerror = function () { addLog('XMLHttpRequest error!'); fn(); };
+			xhr.open('GET', rawurl + filename, true);
+			xhr.timeout = 10000;
+			xhr.responseType = "arraybuffer";
+			xhr.send();
+		}
+
         function connect() {
             PServ = $('iPServ').value;
             PChar = $('iPChar').value;
@@ -86,6 +114,8 @@
                 bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
                 addLog("Connecting to: " + bluetoothDevice.name);
                 doConnect();
+
+                //ajax_file('m001L.bin', getFirmwareArray);
             }).catch(handleError);
         }
 

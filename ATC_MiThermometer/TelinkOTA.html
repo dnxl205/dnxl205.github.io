@@ -26,6 +26,7 @@
         let timeoutTimer = null;  //超时定时器
         var timeoutCnt = 0;       //超时计数
         var timeoutTimes = 0;     //超时次数
+        var xmlResendCnt = 0;     //XML重发次数
 
         var $ = function (id) { return document.getElementById(id); }
 
@@ -35,6 +36,7 @@
             Theservice = null;
             writeCharacteristic = null;
             firmwareSize = 0;
+            xmlResendCnt = 0;
         }
 
         function handleError(error) {
@@ -55,10 +57,25 @@
         }
 
 		function getFirmwareArray(data, filename) {
-			addLog("File: " + filename);
-			firmwareArray = bytesToHex(data);
             firmwareSize = firmwareArray.length / 2;
-            addLog("File was selected, size: " + firmwareSize + " bytes");
+
+            if(firmwareSize > 0){
+                xmlResendCnt = 0;
+
+                addLog("File: " + filename);
+                firmwareArray = bytesToHex(data);
+                addLog("File was selected, size: " + firmwareSize + " bytes");
+            }else{
+                xmlResendCnt = xmlResendCnt + 1;
+
+                if(xmlResendCnt <= 3){
+                    addLog("xml resend : " + xmlResendCnt);
+                    ajax_file('m001L.bin', getFirmwareArray);
+                }else{
+                    xmlResendCnt = 0;
+                    addLog("xml send fail");
+                }
+            }
 		}
 
 		function ajax_file(filename, fn, rawurl = "https://raw.githubusercontent.com/dnxl205/dnxl205.github.io/main/ATC_MiThermometer/") {
@@ -77,7 +94,7 @@
 			xhr.ontimeout = function () { addLog('XMLHttpRequest: timeout'); fn(); };
 			xhr.onerror = function () { addLog('XMLHttpRequest error!'); fn(); };
 			xhr.open('GET', rawurl + filename, true);
-			xhr.timeout = 10000;
+			xhr.timeout = 3000;
 			xhr.responseType = "arraybuffer";
 			xhr.send();
 		}

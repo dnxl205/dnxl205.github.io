@@ -37,6 +37,7 @@
             writeCharacteristic = null;
             firmwareSize = 0;
             xmlResendCnt = 0;
+            cur_progress = 0;
         }
 
         function handleError(error) {
@@ -351,7 +352,7 @@
                     addLog("Get Device");
                     ota_step = 6;
                     bleSend(ota_step);                
-                }, 1000);
+                }, 1500);
             }).catch(handleError);
         }
 
@@ -586,14 +587,14 @@
 
                 var times = 0;
                 if(ota_step == 5)
-                    times = 10;
+                    times = 12;
                 else
-                    times = 4;
+                    times = 6;
 
                 if(timeoutCnt > times){
                     timeoutCnt = 0;
 
-                    if(timeoutTimes <= 3){
+                    if(timeoutTimes <= 5){
                         timeoutTimes = timeoutTimes + 1;
                         console.log('resend');
                         bleSend(ota_step);

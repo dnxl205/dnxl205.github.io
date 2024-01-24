@@ -330,6 +330,7 @@
                                         }
                                         else
                                         {
+                                            cur_progress = 0;
                                             addLog("OTA finish");
                                         }
 
@@ -344,12 +345,12 @@
                 });
 
                 setTimeout(function () {
+                    setTimer();
+
                     //发送【获取设备】指令
                     addLog("Get Device");
                     ota_step = 6;
-                    bleSend(ota_step);
-
-                    setTimer();
+                    bleSend(ota_step);                
                 }, 1000);
             }).catch(handleError);
         }
@@ -592,7 +593,7 @@
                 if(timeoutCnt > times){
                     timeoutCnt = 0;
 
-                    if(timeoutTimes < 3){
+                    if(timeoutTimes <= 3){
                         timeoutTimes = timeoutTimes + 1;
                         console.log('resend');
                         bleSend(ota_step);
@@ -611,12 +612,12 @@
                 return;
             }
 
+            setTimer();
+
             //第一步：发送【擦除固件】指令
             addLog("ota_step 1: Erase firmware");
             ota_step = 1;
             bleSend(ota_step);
-
-            setTimer();
 
             // setTimeout(function() {
             //     otaCharSend("00ff").then(function(character) {

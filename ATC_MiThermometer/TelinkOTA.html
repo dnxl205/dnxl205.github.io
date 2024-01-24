@@ -94,17 +94,17 @@
                 addLog('ActiveXObject');
             }
             
-			if (!xhr) { addLog(msg("Your browser does not support AJAX!")); fn(); return; };
+			if (!xhr) { addLog(msg("Your browser does not support AJAX!")); return; };
 			xhr.onreadystatechange = function () {
 				if (xhr.readyState == 4) {
 					if (xhr.status == 200) fn(xhr.response, filename);
-					else { addLog('XMLHttpRequest: response ' + xhr.status); fn(); }
+					else { addLog('XMLHttpRequest: response ' + xhr.status);}
 					xhr.abort();
 					xhr = null;
 				}
 			};
-			xhr.ontimeout = function () { addLog('XMLHttpRequest: timeout'); fn(); };
-			xhr.onerror = function () { addLog('XMLHttpRequest error!'); fn(); };
+			xhr.ontimeout = function () { addLog('XMLHttpRequest: timeout');};
+			xhr.onerror = function () { addLog('XMLHttpRequest error!');};
 			xhr.open('GET', rawurl + filename, true);
 			xhr.timeout = 5000;
 			xhr.responseType = "arraybuffer";

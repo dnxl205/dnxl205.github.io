@@ -320,12 +320,12 @@
                                             //M001L&P主板
                                             if(uint8Array[14] == 11 || uint8Array[14] == 12){
                                                 addLog("Device: M001L&P");
-                                                ajax_file('m001L.bin', getFirmwareArray);
+                                                ajax_file('M001L_V0_24.bin', getFirmwareArray);
                                             }
                                             //M101主板
                                             else if(uint8Array[14] == 101){
                                                 addLog("Device: M101");
-                                                ajax_file('m101.bin', getFirmwareArray);
+                                                ajax_file('M101_V1_24.bin', getFirmwareArray);
                                             }
                                         }
                                         else

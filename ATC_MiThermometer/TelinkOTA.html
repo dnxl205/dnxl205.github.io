@@ -264,7 +264,6 @@
                                         timeoutCnt = 0; //超时计数清零
 
                                         cur_progress = 0;
-                                        addLog("cur_progress" + cur_progress);
 
                                         //第二步：发送【固件长度】指令
                                         addLog("ota_step 2: Start write firmware");
@@ -288,6 +287,23 @@
                                         ota_step = 3;
 
                                         cur_progress = (blockNr * 192) /  firmwareSize * 100;
+                                        if(cur_progress > 100) cur_progress = 100;
+
+                                        if(blockNr != 0)
+                                        {
+                                            var text = $("log").innerHTML;
+                                            var lastIndex = text.lastIndexOf("<br>");
+                                            if (lastIndex !== -1) {
+                                                var secondLastIndex = text.lastIndexOf("<br>", lastIndex - 1);
+                                                if (secondLastIndex !== -1) {
+                                                    var updatedText = text.substring(0, secondLastIndex + 4);
+                                                    $("log").innerHTML = updatedText;
+                                                }
+                                            }
+                                        }
+                                        addLog('cur_progress: ' + cur_progress.toFixed(1) + ' %');
+                                        console.log('cur_progress: ' + cur_progress.toFixed(1) + ' %');
+
                                         if(cur_progress < 100){
                                             //第三步：发送【固件数据】指令
                                             bleSend(ota_step);
@@ -300,9 +316,6 @@
                                             ota_step = 4;
                                             bleSend(ota_step);
                                         }
-                                        $("log").innerHTML = "";
-                                        addLog('cur_progress: ' + cur_progress.toFixed(1) + ' %');
-                                        console.log('cur_progress: ' + cur_progress.toFixed(1) + ' %');
                                     }
                                 }
 
@@ -753,7 +766,7 @@
     <label for="hideUnknown">Hide unknown</label>
     <input type="checkbox" id="hideUnknown" checked><br>
     <label for="namePrefix">BLE device name prefix filter(s)</label>
-    <input type="text" id="namePrefix" value="" placeholder="LYWSD03,ATC"><br>
+    <input type="text" id="namePrefix" value="ai-thinker" placeholder="ai-thinker,ATC"><br>
     <hr>
     Please select a .bin file you want to flash to a Telink BLE device.<br>
     Select Firmware: <input type="file" accept=".bin" id="file" /><br>

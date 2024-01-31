@@ -121,7 +121,8 @@
                 optionalServices: [PServ],
                 acceptAllDevices: true,
             };
-            const hideUnknown = $('hideUnknown').checked;
+            // const hideUnknown = $('hideUnknown').checked;
+            const hideUnknown = true;
             const namePrefix = $('namePrefix').value;
             if (hideUnknown) {
                 deviceOptions.acceptAllDevices = false;

@@ -30,6 +30,7 @@
         
         var M001L_Fireware_Name = 'M001L_V0_23.bin';
         var M101_Fireware_Name = 'M101_V1_23.bin';
+        var M101_Disp_Lastest_Fireware = 'V100';
 
         var $ = function (id) { return document.getElementById(id); }
 
@@ -346,13 +347,32 @@
                                         {
                                             //M001L&P主板
                                             if(uint8Array[14] == 11 || uint8Array[14] == 12){
-                                                addLog("Device: M001L&P");
+                                                addLog("Device: M001L&P MainBoard");
                                                 ajax_file(M001L_Fireware_Name, getFirmwareArray);
                                             }
-                                            //M101主板
+                                            //M101
                                             else if(uint8Array[14] == 101){
-                                                addLog("Device: M101");
-                                                ajax_file(M101_Fireware_Name, getFirmwareArray);
+                                                //M101 显示板
+                                                if(uint8Array.length > 82 && uint8Array[10] == 0x01 && uint8Array[11] == 0x02)
+                                                {
+                                                    addLog("Device: M101 Display");
+
+                                                    var disp_version = uint8Array[78] * 100 + uint8Array[79] * 10 + uint8Array[80];
+                                                    var language = uint8Array[81] * 10 + uint8Array[82];
+                                                    if(language == 0) language = 'ZH';
+                                                    else if(language == 1) language = 'JP';
+                                                    else if(language == 2) language = 'EN';
+                                                    var ota_fireware_name = 'V' + disp_version + '_TO_' +M101_Disp_Lastest_Fireware + '_' + language;
+
+                                                    addLog("ota_fireware_name:" + ota_fireware_name);//V100_TO_V100_ZH
+                                                    ajax_file(ota_fireware_name, getFirmwareArray);
+                                                }
+                                                //M101 主板
+                                                else
+                                                {
+                                                    addLog("Device: M101 MainBoard");
+                                                    ajax_file(M101_Fireware_Name, getFirmwareArray);
+                                                }
                                             }
                                         }
                                         else

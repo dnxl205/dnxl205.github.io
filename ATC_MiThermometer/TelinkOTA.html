@@ -364,8 +364,17 @@
                                                     else if(language == 2) language = 'EN';
                                                     var ota_fireware_name = 'V' + disp_version + '_TO_' +M101_Disp_Lastest_Fireware + '_' + language;
 
-                                                    addLog("ota_fireware_name:" + ota_fireware_name);//V100_TO_V100_ZH
-                                                    ajax_file(ota_fireware_name, getFirmwareArray);
+                                                    //版本号相同
+                                                    if( ('V' + disp_version) == M101_Disp_Lastest_Fireware)
+                                                    {
+                                                        cur_progress = 0;
+                                                        addLog("No Upgrade Required");
+                                                    }
+                                                    else
+                                                    {
+                                                        addLog("ota_fireware_name:" + ota_fireware_name);//V100_TO_V100_ZH
+                                                        ajax_file(ota_fireware_name, getFirmwareArray);
+                                                    }
                                                 }
                                                 //M101 主板
                                                 else

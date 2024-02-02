@@ -30,7 +30,7 @@
         
         var M001L_Fireware_Name = 'M001L_V0_23.bin';
         var M101_Fireware_Name = 'M101_V1_23.bin';
-        var M101_Disp_Lastest_Fireware = 'V100';
+        var M101_Disp_Lastest_Fireware = 100;
 
         var $ = function (id) { return document.getElementById(id); }
 
@@ -362,10 +362,12 @@
                                                     if(language == 0) language = 'ZH';
                                                     else if(language == 1) language = 'JP';
                                                     else if(language == 2) language = 'EN';
-                                                    var ota_fireware_name = 'V' + disp_version + '_TO_' +M101_Disp_Lastest_Fireware + '_' + language;
+                                                    var ota_fireware_name = 'V' + disp_version + '_TO_V' + M101_Disp_Lastest_Fireware + '_' + language;
 
-                                                    //版本号相同
-                                                    if( ('V' + disp_version) == M101_Disp_Lastest_Fireware)
+                                                    addLog("Cur version: V" + disp_version);
+
+                                                    //版本号相同或更大
+                                                    if(disp_version >= M101_Disp_Lastest_Fireware)
                                                     {
                                                         cur_progress = 0;
                                                         addLog("No Upgrade Required");

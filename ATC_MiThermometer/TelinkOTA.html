@@ -166,7 +166,7 @@
                 data[2] = firmwareSize >> 8;
                 data[3] = firmwareSize >> 16;
                 data[4] = firmwareSize >> 24;
-                var string = get_packet_body(0, 0, 0, 0, 0x03, data);
+                var string = get_packet_body(0, 2, 0, 0, 0x03, data);
                 otaCharSend(string);
             }
             else if(step == 3){

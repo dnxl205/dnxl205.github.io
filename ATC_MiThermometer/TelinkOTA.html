@@ -201,6 +201,14 @@
                 var string = get_packet_body(0, 2, 0, 0, 0x01, data);
                 otaCharSend(string);
             }
+            else if(step == 7){
+                var data = new Uint8Array(3);
+                data[0] = 0xAA;
+                data[1] = 0xAA;
+                data[2] = 0xAA;
+                var string = arrayToHexString(data);
+                otaCharSend(string);
+            }
         }
 
         function doConnect() {
@@ -390,6 +398,8 @@
                                         {
                                             cur_progress = 0;
                                             addLog("OTA finish");
+                                            ota_step = 7;
+                                            bleSend(ota_step);
                                         }
 
                                         ota_step = 0;

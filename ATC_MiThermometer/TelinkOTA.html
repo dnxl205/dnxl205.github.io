@@ -22,12 +22,14 @@
         var connectTrys = 0;
         var ota_step = 0;
         var firmwareSize = 0;
-        var frameArray = null;    //粘包数组
         let timeoutTimer = null;  //超时定时器
         var timeoutCnt = 0;       //超时计数
         var timeoutTimes = 0;     //超时次数
         var xmlResendCnt = 0;     //XML重发次数
         
+        // 数据接收队列
+        let recvQueue = [];
+
         var M001L_Fireware_Name = 'M001L_V0_23.bin';
         var M101_Fireware_Name = 'M101_V1_26.bin';
         var M101_Disp_Lastest_Fireware = 100;
@@ -152,6 +154,7 @@
         }
 
         function bleSend(step){
+            // 擦除固件
             if(step == 1){
                 var data = new Uint8Array(2);
                 data[0] = 0x03;
@@ -159,6 +162,7 @@
                 var string = get_packet_body(0, 2, 0, 0, 0x02, data);
                 otaCharSend(string);
             }
+            // 固件长度
             else if(step == 2){
                 var data = new Uint8Array(5);
                 data[0] = 0x03;
@@ -169,6 +173,7 @@
                 var string = get_packet_body(0, 2, 0, 0, 0x03, data);
                 otaCharSend(string);
             }
+            // 固件数据
             else if(step == 3){
                 var data = firmwareArray.substring(blockNr * 384, blockNr * 384 + 384);
                 var dataArray = Array.from(new Uint8Array(data.match(/.{1,2}/g).map(byte => parseInt(byte, 16))));
@@ -177,6 +182,7 @@
                     otaCharSend(string);
                 }, 20);
             }
+            // 固件结束
             else if(step == 4){
                 var data = new Uint8Array(3);
                 data[0] = 0x06;
@@ -185,6 +191,7 @@
                 var string = get_packet_body(0, 2, 0, 0, 0x05, data);
                 otaCharSend(string);
             }
+            // 程序复位
             else if(step == 5){
                 var data = new Uint8Array(3);
                 data[0] = 0x01;
@@ -195,6 +202,7 @@
                     otaCharSend(string);
                 }, 3000);
             }
+            // 获取状态
             else if(step == 6){
                 var data = new Uint8Array(1);
                 data[0] = 0x00;
@@ -208,6 +216,283 @@
                 data[2] = 0xAA;
                 var string = arrayToHexString(data);
                 otaCharSend(string);
+            }
+        }
+
+        let frame = {
+            status:0,   // 解析状态
+            data_pos:0, // 数据接收索引
+            pre_data:0, // 上一个数据
+
+            type:0,
+            send:0,
+            dest:0,
+            id:0,
+            op:0,
+            len:0,
+            data:{},
+            crc1:0,
+            crc2:0,
+            crc3:0,
+            crc4:0
+        };
+
+        function frame_handle(frame) {
+            switch (ota_step) {
+                // 擦除固件
+                case 0x01:
+                    if(frame.op == 0x02 && frame.data[0] == 0x7c){
+                        timeoutCnt = 0; //超时计数清零
+
+                        cur_progress = 0;
+
+                        //第二步：发送【固件长度】指令
+                        addLog("ota_step 2: Start write firmware");
+                        ota_step = 2;
+                        bleSend(ota_step);
+                    }
+                    break;
+
+                case 0x02:  // 固件长度
+                case 0x03:  // 固件数据
+                    if((frame.op == 0x03 || frame.op == 0x04) && 
+                       (frame.data[0] == 0x7c || frame.data[0] == 0x79)){
+                        timeoutCnt = 0; //超时计数清零
+
+                        if(ota_step == 2){
+                            blockNr = 0;
+                            addLog("ota_step 3: Writing firmware");
+                        } 
+                        else{
+                            blockNr = blockNr + 1;
+                        }
+
+                        ota_step = 3;
+
+                        cur_progress = (blockNr * 192) /  firmwareSize * 100;
+                        if(cur_progress > 100) cur_progress = 100;
+
+                        if(blockNr != 0)
+                        {
+                            var text = $("log").innerHTML;
+                            var lastIndex = text.lastIndexOf("<br>");
+                            if (lastIndex !== -1) {
+                                var secondLastIndex = text.lastIndexOf("<br>", lastIndex - 1);
+                                if (secondLastIndex !== -1) {
+                                    var updatedText = text.substring(0, secondLastIndex + 4);
+                                    $("log").innerHTML = updatedText;
+                                }
+                            }
+                        }
+                        addLog('cur_progress: ' + cur_progress.toFixed(1) + ' %');
+                        console.log('cur_progress: ' + cur_progress.toFixed(1) + ' %');
+
+                        if(cur_progress < 100){
+                            //第三步：发送【固件数据】指令
+                            bleSend(ota_step);
+                        }
+                        else{
+                            cur_progress = 100;
+
+                            //第四步：发送【固件结束】指令
+                            addLog("ota_step 4: Write firmware end");
+                            ota_step = 4;
+                            bleSend(ota_step);
+                        }
+                    }
+                    break;
+            
+                // 固件结束
+                case 0x04:
+                    if(frame.op == 0x05 && frame.data[0] == 0x7f){
+                        timeoutCnt = 0; //超时计数清零
+
+                        //第五步：发送【程序复位】指令
+                        addLog("ota_step 5: Reset");
+                        ota_step = 5;
+                        bleSend(ota_step);
+                    }
+                    break;
+
+                // 程序复位
+                case 0x05:
+                    if(frame.op == 0x06 && frame.data[0] == 0x79){
+                        timeoutCnt = 0; //超时计数清零
+
+                        //第六步：发送【获取状态】指令
+                        addLog("ota_step 6: Get status");
+                        ota_step = 6;
+                        bleSend(ota_step);
+                    }
+                    break;
+
+                // 获取状态
+                case 0x06:
+                    if(frame.op == 0x01 && frame.data[0] == 0x79){
+                        if(cur_progress < 100)
+                        {
+                            //M001L&P主板
+                            if(frame.data[6] == 11 || frame.data[6] == 12){
+                                addLog("Device: M001L&P MainBoard");
+                                ajax_file(M001L_Fireware_Name, getFirmwareArray);
+                            }
+                            //M101
+                            else if(frame.data[6] == 101){
+                                //M101 显示板
+                                if(frame.data[2] == 0x01 && frame.data[3] == 0x02)
+                                {
+                                    addLog("Device: M101 Display");
+
+                                    var disp_version = frame.data[70] * 100 + frame.data[71] * 10 + frame.data[72];
+                                    var language = frame.data[73] * 10 + frame.data[74];
+                                    if(language == 1) language = 'JP';
+                                    else if(language == 2) language = 'EN';
+                                    else language = 'ZH';
+                                    var ota_fireware_name = 'V' + disp_version + '_TO_V' + M101_Disp_Lastest_Fireware + '_' + language;
+
+                                    addLog("Cur version: V" + disp_version);
+
+                                    //版本号相同或更大
+                                    if(disp_version >= M101_Disp_Lastest_Fireware)
+                                    {
+                                        cur_progress = 0;
+                                        addLog("No Upgrade Required");
+                                    }
+                                    else
+                                    {
+                                        addLog("ota_fireware_name:" + ota_fireware_name);//V100_TO_V100_ZH
+                                        ajax_file(ota_fireware_name, getFirmwareArray);
+                                    }
+                                }
+                                //M101 主板
+                                else
+                                {
+                                    addLog("Device: M101 MainBoard");
+                                    ajax_file(M101_Fireware_Name, getFirmwareArray);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            cur_progress = 0;
+                            addLog("OTA finish");
+                            ota_step = 7;
+                            bleSend(ota_step);
+                        }
+
+                        ota_step = 0;
+                        timeoutCnt = 0;
+                        clearTimeout(timeoutTimer);
+                    }
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
+        function parse_buffer(buffer) {
+            while (buffer.length > 0) {
+                let c = buffer.shift();
+                
+                // 遇到帧头，重新解析
+                if(frame.pre_data == 0xAA && c == 0x55) frame.status = 0x01;
+                frame.pre_data = c;
+
+                switch (frame.status) {
+                    // 帧头1
+                    case 0x00:
+                        if(c == 0xAA) frame.status = 0x01;
+                        break;
+                
+                    // 帧头2
+                    case 0x01:
+                        if(c == 0x55) frame.status = 0x02;
+                        break;
+
+                    // 消息类型
+                    case 0x02:
+                        frame.type = c;
+                        frame.status = 0x03;
+                        break;
+
+                    // 发送者
+                    case 0x03:
+                        frame.send = c;
+                        frame.status = 0x04;
+                        break;
+
+                    // 接收者
+                    case 0x04:
+                        frame.dest = c;
+                        frame.status = 0x05;
+                        break;
+
+                    // 消息id
+                    case 0x05:
+                        frame.id = c;
+                        frame.status = 0x06;
+                        break;
+
+                    // 操作类型
+                    case 0x06:
+                        frame.op = c;
+                        frame.status = 0x07;
+                        break;
+
+                    // 长度
+                    case 0x07:
+                        frame.len = c;
+                        frame.data = {};
+                        frame.data_pos = 0;
+                        frame.status = 0x08;
+                        break;
+
+                    // 数据
+                    case 0x08:
+                        frame.data[frame.data_pos++] = c;
+                        if(frame.data_pos >= frame.len) frame.status = 0x09;
+                        break;
+
+                    // crc1
+                    case 0x09:
+                        frame.crc1 = c;
+                        frame.status = 0x0A;
+                        break;
+
+                    // crc2
+                    case 0x0A:
+                        frame.crc2 = c;
+                        frame.status = 0x0B;
+                        break;
+
+                    // crc3
+                    case 0x0B:
+                        frame.crc3 = c;
+                        frame.status = 0x0C;
+                        break;
+
+                    // crc4
+                    case 0x0C:
+                        frame.crc4 = c;
+                        frame.status = 0x00;
+
+                        // 计算CRC
+                        let origin = [0xAA, 0x55, frame.type, frame.send, frame.dest, frame.id, frame.op, frame.len];
+                        for (let i = 0; i < frame.len; i++) {
+                            origin.push(frame.data[i]);
+                        }
+                        let crc_frame = crc32(origin);
+                        let crc_data = (frame.crc4 << 24) + (frame.crc3 << 16) + (frame.crc2 << 8) + frame.crc1;
+                        if(crc_frame == crc_data){
+                            console.log('crc ok');
+                            frame_handle(frame);
+                        }
+                        break;
+
+                    default:
+                        break;
+                }
             }
         }
 
@@ -234,180 +519,20 @@
                     var nitifiyCharTemp = characteristic;
                     nitifiyCharTemp.startNotifications().then(() => {
                         nitifiyCharTemp.addEventListener('characteristicvaluechanged', event => {
-                            let value = event.target.value.buffer;
+                            let value = event.target.value.buffer;                            
                             let uint8Array = new Uint8Array(value);
 
-                            //帧头
-                            if(uint8Array.length >= 2 && uint8Array[0] == 0xaa && uint8Array[1] == 0x55){
-                                //数据不足，保留数据，退出
-                                if(uint8Array.length < 8 || uint8Array.length < (8 + uint8Array[7] + 4)){
-                                    frameArray = null; 
-                                    frameArray = new Uint8Array(uint8Array);
-                                    return;
-                                }
+                            // 打印数据
+                            let string = Array.from(uint8Array, byte => ('0' + byte.toString(16).toUpperCase()).slice(-2)).join(' ');
+                            console.log('recv:' + string);
+
+                            // 数据入队
+                            for (let i = 0; i < uint8Array.length; i++) {
+                                recvQueue.push(uint8Array[i]);
                             }
-                            //帧尾
-                            else if(frameArray != null){
-                                var combinedData = new Uint8Array(frameArray.length + uint8Array.length);
-                                combinedData.set(frameArray, 0);
-                                combinedData.set(uint8Array, frameArray.length);
-                                frameArray = combinedData;
-                                uint8Array = combinedData;
-                                
-                                //未接收完成
-                                if(frameArray.length < 8 || frameArray.length < (8 + frameArray[7] + 4)){
-                                    return;
-                                }
-                            }
-                            frameArray = null;
 
-                            let hexArray = Array.from(uint8Array, byte => byte.toString(16).padStart(2, '0'));
-                            let hexString = hexArray.join('');
-                            console.log('recv:' + hexString);
-
-                            var got_crc = hexString.substring(hexString.length - 8);
-                            var origin_data = hexString.substring(0, hexString.length - 8);
-                            var tag_crc = getHexCRC(origin_data);
-                            if (got_crc.toLowerCase() === tag_crc.toLowerCase()){
-                                if(ota_step == 1){
-                                    if(uint8Array[8] == 0x7c){
-                                        timeoutCnt = 0; //超时计数清零
-
-                                        cur_progress = 0;
-
-                                        //第二步：发送【固件长度】指令
-                                        addLog("ota_step 2: Start write firmware");
-                                        ota_step = 2;
-                                        bleSend(ota_step);
-                                    }
-                                }
-
-                                else if(ota_step == 2 || ota_step == 3){
-                                    if(uint8Array[8] == 0x7c || uint8Array[8] == 0x79){
-                                        timeoutCnt = 0; //超时计数清零
-
-                                        if(ota_step == 2){
-                                            blockNr = 0;
-                                            addLog("ota_step 3: Writing firmware");
-                                        } 
-                                        else{
-                                            blockNr = blockNr + 1;
-                                        }
-
-                                        ota_step = 3;
-
-                                        cur_progress = (blockNr * 192) /  firmwareSize * 100;
-                                        if(cur_progress > 100) cur_progress = 100;
-
-                                        if(blockNr != 0)
-                                        {
-                                            var text = $("log").innerHTML;
-                                            var lastIndex = text.lastIndexOf("<br>");
-                                            if (lastIndex !== -1) {
-                                                var secondLastIndex = text.lastIndexOf("<br>", lastIndex - 1);
-                                                if (secondLastIndex !== -1) {
-                                                    var updatedText = text.substring(0, secondLastIndex + 4);
-                                                    $("log").innerHTML = updatedText;
-                                                }
-                                            }
-                                        }
-                                        addLog('cur_progress: ' + cur_progress.toFixed(1) + ' %');
-                                        console.log('cur_progress: ' + cur_progress.toFixed(1) + ' %');
-
-                                        if(cur_progress < 100){
-                                            //第三步：发送【固件数据】指令
-                                            bleSend(ota_step);
-                                        }
-                                        else{
-                                            cur_progress = 100;
-
-                                            //第四步：发送【固件结束】指令
-                                            addLog("ota_step 4: Write firmware end");
-                                            ota_step = 4;
-                                            bleSend(ota_step);
-                                        }
-                                    }
-                                }
-
-                                else if(ota_step == 4){
-                                    if(uint8Array[8] == 0x7f){
-                                        timeoutCnt = 0; //超时计数清零
-
-                                        //第五步：发送【程序复位】指令
-                                        addLog("ota_step 5: Reset");
-                                        ota_step = 5;
-                                        bleSend(ota_step);
-                                    }
-                                }
-
-                                else if(ota_step == 5){
-                                    if(uint8Array[8] == 0x79){
-                                        timeoutCnt = 0; //超时计数清零
-
-                                        //第六步：发送【获取状态】指令
-                                        addLog("ota_step 6: Get status");
-                                        ota_step = 6;
-                                        bleSend(ota_step);
-                                    }
-                                }else if(ota_step == 6){
-                                    if(uint8Array[8] == 0x79){
-                                        if(cur_progress < 100)
-                                        {
-                                            //M001L&P主板
-                                            if(uint8Array[14] == 11 || uint8Array[14] == 12){
-                                                addLog("Device: M001L&P MainBoard");
-                                                ajax_file(M001L_Fireware_Name, getFirmwareArray);
-                                            }
-                                            //M101
-                                            else if(uint8Array[14] == 101){
-                                                //M101 显示板
-                                                if(uint8Array.length > 82 && uint8Array[10] == 0x01 && uint8Array[11] == 0x02)
-                                                {
-                                                    addLog("Device: M101 Display");
-
-                                                    var disp_version = uint8Array[78] * 100 + uint8Array[79] * 10 + uint8Array[80];
-                                                    var language = uint8Array[81] * 10 + uint8Array[82];
-                                                    if(language == 0) language = 'ZH';
-                                                    else if(language == 1) language = 'JP';
-                                                    else if(language == 2) language = 'EN';
-                                                    var ota_fireware_name = 'V' + disp_version + '_TO_V' + M101_Disp_Lastest_Fireware + '_' + language;
-
-                                                    addLog("Cur version: V" + disp_version);
-
-                                                    //版本号相同或更大
-                                                    if(disp_version >= M101_Disp_Lastest_Fireware)
-                                                    {
-                                                        cur_progress = 0;
-                                                        addLog("No Upgrade Required");
-                                                    }
-                                                    else
-                                                    {
-                                                        addLog("ota_fireware_name:" + ota_fireware_name);//V100_TO_V100_ZH
-                                                        ajax_file(ota_fireware_name, getFirmwareArray);
-                                                    }
-                                                }
-                                                //M101 主板
-                                                else
-                                                {
-                                                    addLog("Device: M101 MainBoard");
-                                                    ajax_file(M101_Fireware_Name, getFirmwareArray);
-                                                }
-                                            }
-                                        }
-                                        else
-                                        {
-                                            cur_progress = 0;
-                                            addLog("OTA finish");
-                                            ota_step = 7;
-                                            bleSend(ota_step);
-                                        }
-
-                                        ota_step = 0;
-                                        timeoutCnt = 0;
-                                        clearTimeout(timeoutTimer);
-                                    }
-                                }
-                            }
+                            // 数据解析
+                            parse_buffer(recvQueue);
                         });
                     });
                 });

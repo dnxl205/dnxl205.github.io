@@ -33,7 +33,7 @@
         var M001L_Fireware_Name = 'M001L_V0_23.bin';
         var M101_Fireware_Name = 'M101_V1_26.bin';
         var M101_Mainboard_Lastest_Fireware = 126;
-        var M101_Disp_Lastest_Fireware = 100;
+        var M101_Disp_Lastest_Fireware = 101;
 
         let m101_version = {
             status:0,       // 获取版本的状态 0：默认状态 1：正在获取disp版本 2：正在获取mainboard版本 3: 正在进行mainboard程序更新 4：正在进行disp程序更新
@@ -76,6 +76,13 @@
             firmwareSize = firmwareArray.length / 2;
             addLog("File: " + filename);
             addLog("File was selected, size: " + firmwareSize + " bytes");
+
+            setTimer();
+
+            //第一步：发送【擦除固件】指令
+            addLog("ota_step 1: Erase firmware");
+            ota_step = 1;
+            bleSend(ota_step);
 
             // if(firmwareSize > 0){
             //     xmlResendCnt = 0;
@@ -237,10 +244,12 @@
                 var string;
                 switch (m101_version.status) {
                     case 0x01:  // 获取Disp版本
+                    case 0x04:
                         string = get_packet_body(0, 3, 2, 0, 0x01, data);
                         break;
                 
                     case 0x02:  // 获取Mainboard版本
+                    case 0x03:
                         string = get_packet_body(0, 3, 1, 0, 0x01, data);
                         break;
 
@@ -349,10 +358,19 @@
                     if(frame.op == 0x05 && frame.data[0] == 0x7f){
                         timeoutCnt = 0; //超时计数清零
 
-                        //第五步：发送【程序复位】指令
-                        addLog("ota_step 5: Reset");
-                        ota_step = 5;
-                        bleSend(ota_step);
+                        // Disp更新完成
+                        if(m101_version.status == 4)
+                        {
+                            clearTimeout(timeoutTimer);
+                            addLog("Upgrade Finish");
+                        }
+                        else
+                        {
+                            //第五步：发送【程序复位】指令
+                            addLog("ota_step 5: Reset");
+                            ota_step = 5;
+                            bleSend(ota_step);
+                        }
                     }
                     break;
 
@@ -387,12 +405,16 @@
                             timeoutCnt = 0;
                             clearTimeout(timeoutTimer);
 
-                            //发送【获取设备】指令
-                            setTimer();
-                            addLog("Get Mainborad Verison");
-                            m101_version.status = 2;
-                            ota_step = 0;
-                            bleSend(ota_step);   
+                            // 获取版本号
+                            if(ota_step == 0x00)
+                            {
+                                //发送【获取设备】指令
+                                setTimer();
+                                addLog("Get Mainborad Verison");
+                                m101_version.status = 2;
+                                ota_step = 0;
+                                bleSend(ota_step);  
+                            }
                         }
                         // Mainboard 版本号
                         else if(frame.data[6] == 101 && frame.data[2] == 0x14 && frame.data[3] == 0x04)
@@ -404,7 +426,15 @@
                             timeoutCnt = 0;
                             clearTimeout(timeoutTimer);
 
-                            ajax_file(M101_Fireware_Name, getFirmwareArray);
+                            // Mainboard更新完成
+                            if(ota_step == 0x06)
+                            {
+                                addLog("Disp Upgrade");
+                                addLog("Disp Lastest Ver: V" + M101_Disp_Lastest_Fireware);
+
+                                m101_version.status = 4;
+                                ajax_file("V100_TO_V101_ZH", getFirmwareArray);
+                            }
                         }
                     }
                     break;
@@ -828,26 +858,17 @@
         }
 
         function updateBegin() {
-            if (firmwareSize <= 0) {
-                addLog("No file selected aborting");
-                return;
-            }
+            // if (firmwareSize <= 0) {
+            //     addLog("No file selected aborting");
+            //     return;
+            // }
 
-            // 如果Mainboard有更新版本，进行更新
-            //if(M101_Mainboard_Lastest_Fireware > m101_version.mainboard)
-            if(1)
-            {
-                addLog("Mainboard Lastest Ver: " + (M101_Mainboard_Lastest_Fireware / 100));
-                addLog("Mainboard Upgrade");
+            // Mainboard更新
+            addLog("Mainboard Upgrade");
+            addLog("Mainboard Lastest Ver: " + (M101_Mainboard_Lastest_Fireware / 100));
 
-                setTimer();
-
-                //第一步：发送【擦除固件】指令
-                m101_version.status = 3;
-                addLog("ota_step 1: Erase firmware");
-                ota_step = 1;
-                bleSend(ota_step);
-            }
+            m101_version.status = 3;
+            ajax_file(M101_Fireware_Name, getFirmwareArray);
 
             // setTimeout(function() {
             //     otaCharSend("00ff").then(function(character) {

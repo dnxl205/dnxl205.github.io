@@ -32,7 +32,15 @@
 
         var M001L_Fireware_Name = 'M001L_V0_23.bin';
         var M101_Fireware_Name = 'M101_V1_26.bin';
+        var M101_Mainboard_Lastest_Fireware = 126;
         var M101_Disp_Lastest_Fireware = 100;
+
+        let m101_version = {
+            status:0,       // 获取版本的状态 0：默认状态 1：正在获取disp版本 2：正在获取mainboard版本 3: 正在进行mainboard程序更新 4：正在进行disp程序更新
+            disp:0,
+            disp_language:0,    //0：中文 1：日语 2：英语
+            mainboard:0
+        };
 
         var $ = function (id) { return document.getElementById(id); }
 
@@ -159,7 +167,11 @@
                 var data = new Uint8Array(2);
                 data[0] = 0x03;
                 data[1] = 0x01;
-                var string = get_packet_body(0, 2, 0, 0, 0x02, data);
+                var string;
+                if(m101_version.status == 0x03)
+                    string = get_packet_body(0, 3, 1, 0, 0x02, data);
+                else
+                    string = get_packet_body(0, 3, 2, 0, 0x02, data);
                 otaCharSend(string);
             }
             // 固件长度
@@ -170,14 +182,22 @@
                 data[2] = firmwareSize >> 8;
                 data[3] = firmwareSize >> 16;
                 data[4] = firmwareSize >> 24;
-                var string = get_packet_body(0, 2, 0, 0, 0x03, data);
+                var string;
+                if(m101_version.status == 0x03)
+                    string = get_packet_body(0, 3, 1, 0, 0x03, data);
+                else
+                    string = get_packet_body(0, 3, 2, 0, 0x03, data);
                 otaCharSend(string);
             }
             // 固件数据
             else if(step == 3){
                 var data = firmwareArray.substring(blockNr * 384, blockNr * 384 + 384);
                 var dataArray = Array.from(new Uint8Array(data.match(/.{1,2}/g).map(byte => parseInt(byte, 16))));
-                var string = get_packet_body(0, 2, 0, 0, 0x04, dataArray);
+                var string;
+                if(m101_version.status == 0x03)
+                    string = get_packet_body(0, 3, 1, 0, 0x04, dataArray);
+                else
+                    string = get_packet_body(0, 3, 2, 0, 0x04, dataArray);
                 setTimeout(function(){
                     otaCharSend(string);
                 }, 20);
@@ -188,7 +208,11 @@
                 data[0] = 0x06;
                 data[1] = 0x01;
                 data[2] = 0x01;
-                var string = get_packet_body(0, 2, 0, 0, 0x05, data);
+                var string;
+                if(m101_version.status == 0x03)
+                    string = get_packet_body(0, 3, 1, 0, 0x05, data);
+                else
+                    string = get_packet_body(0, 3, 2, 0, 0x05, data);
                 otaCharSend(string);
             }
             // 程序复位
@@ -197,16 +221,33 @@
                 data[0] = 0x01;
                 data[1] = 0x01;
                 data[2] = 0x01;
-                var string = get_packet_body(0, 2, 0, 0, 0x06, data);
+                var string;
+                if(m101_version.status == 0x03)
+                    string = get_packet_body(0, 3, 1, 0, 0x06, data);
+                else
+                    string = get_packet_body(0, 3, 2, 0, 0x06, data);
                 setTimeout(function(){
                     otaCharSend(string);
                 }, 3000);
             }
             // 获取状态
-            else if(step == 6){
+            else if(step == 0 || step == 6){
                 var data = new Uint8Array(1);
                 data[0] = 0x00;
-                var string = get_packet_body(0, 2, 0, 0, 0x01, data);
+                var string;
+                switch (m101_version.status) {
+                    case 0x01:  // 获取Disp版本
+                        string = get_packet_body(0, 3, 2, 0, 0x01, data);
+                        break;
+                
+                    case 0x02:  // 获取Mainboard版本
+                        string = get_packet_body(0, 3, 1, 0, 0x01, data);
+                        break;
+
+                    default:
+                        string = get_packet_body(0, 3, 2, 0, 0x01, data);
+                        break;
+                }
                 otaCharSend(string);
             }
             else if(step == 7){
@@ -255,8 +296,9 @@
 
                 case 0x02:  // 固件长度
                 case 0x03:  // 固件数据
-                    if((frame.op == 0x03 || frame.op == 0x04) && 
-                       (frame.data[0] == 0x7c || frame.data[0] == 0x79)){
+                    if((frame.op == 0x03 && frame.data[0] == 0x7C) || 
+                       (frame.op == 0x04 && frame.data[0] == 0x79))
+                    {
                         timeoutCnt = 0; //超时计数清零
 
                         if(ota_step == 2){
@@ -327,62 +369,43 @@
                     break;
 
                 // 获取状态
+                case 0x00:
                 case 0x06:
                     if(frame.op == 0x01 && frame.data[0] == 0x79){
-                        if(cur_progress < 100)
-                        {
-                            //M001L&P主板
-                            if(frame.data[6] == 11 || frame.data[6] == 12){
-                                addLog("Device: M001L&P MainBoard");
-                                ajax_file(M001L_Fireware_Name, getFirmwareArray);
-                            }
-                            //M101
-                            else if(frame.data[6] == 101){
-                                //M101 显示板
-                                if(frame.data[2] == 0x01 && frame.data[3] == 0x02)
-                                {
-                                    addLog("Device: M101 Display");
+                        // Disp 版本号
+                        if(frame.data[6] == 101 && frame.data[2] == 0x01 && frame.data[3] == 0x02){
+                            m101_version.disp = frame.data[70] * 100 + frame.data[71] * 10 + frame.data[72];
+                            m101_version.disp_language = frame.data[73] * 10 + frame.data[74];
+                            
+                            let language;
+                            if(m101_version.disp_language == 1) language = 'JP';
+                            else if(m101_version.disp_language == 2) language = 'EN';
+                            else language = 'ZH';
 
-                                    var disp_version = frame.data[70] * 100 + frame.data[71] * 10 + frame.data[72];
-                                    var language = frame.data[73] * 10 + frame.data[74];
-                                    if(language == 1) language = 'JP';
-                                    else if(language == 2) language = 'EN';
-                                    else language = 'ZH';
-                                    var ota_fireware_name = 'V' + disp_version + '_TO_V' + M101_Disp_Lastest_Fireware + '_' + language;
+                            addLog("Disp version: V" + m101_version.disp + language);
 
-                                    addLog("Cur version: V" + disp_version);
+                            timeoutCnt = 0;
+                            clearTimeout(timeoutTimer);
 
-                                    //版本号相同或更大
-                                    if(disp_version >= M101_Disp_Lastest_Fireware)
-                                    {
-                                        cur_progress = 0;
-                                        addLog("No Upgrade Required");
-                                    }
-                                    else
-                                    {
-                                        addLog("ota_fireware_name:" + ota_fireware_name);//V100_TO_V100_ZH
-                                        ajax_file(ota_fireware_name, getFirmwareArray);
-                                    }
-                                }
-                                //M101 主板
-                                else
-                                {
-                                    addLog("Device: M101 MainBoard");
-                                    ajax_file(M101_Fireware_Name, getFirmwareArray);
-                                }
-                            }
+                            //发送【获取设备】指令
+                            setTimer();
+                            addLog("Get Mainborad Verison");
+                            m101_version.status = 2;
+                            ota_step = 0;
+                            bleSend(ota_step);   
                         }
-                        else
+                        // Mainboard 版本号
+                        else if(frame.data[6] == 101 && frame.data[2] == 0x14 && frame.data[3] == 0x04)
                         {
-                            cur_progress = 0;
-                            addLog("OTA finish");
-                            ota_step = 7;
-                            bleSend(ota_step);
-                        }
+                            m101_version.mainboard = frame.data[70] * 100 + frame.data[71] * 10 + frame.data[72];
 
-                        ota_step = 0;
-                        timeoutCnt = 0;
-                        clearTimeout(timeoutTimer);
+                            addLog("Mainboard version: V" + (m101_version.mainboard / 100));
+
+                            timeoutCnt = 0;
+                            clearTimeout(timeoutTimer);
+
+                            ajax_file(M101_Fireware_Name, getFirmwareArray);
+                        }
                     }
                     break;
 
@@ -541,8 +564,12 @@
                     setTimer();
 
                     //发送【获取设备】指令
-                    addLog("Get Device");
-                    ota_step = 6;
+                    addLog("Get Disp Verison");
+                    for (let key in m101_version) {
+                        m101_version[key] = 0;
+                    }
+                    m101_version.status = 1;
+                    ota_step = 0;
                     bleSend(ota_step);                
                 }, 1500);
             }).catch(handleError);
@@ -566,6 +593,7 @@
         }
 
         function addLog(logTXT) {
+            console.log(logTXT);
             var time = new Date().toLocaleTimeString();
             var logString = time + ": " + logTXT;
             $("log").innerHTML += logString + "<br>";
@@ -792,7 +820,7 @@
                         bleSend(ota_step);
                     }else{
                         timeoutTimes = 0;
-                        console.log('timeout');
+                        addLog('Timeout');
                         clearTimeout(timeoutTimer);
                     }
                 }
@@ -805,12 +833,21 @@
                 return;
             }
 
-            setTimer();
+            // 如果Mainboard有更新版本，进行更新
+            //if(M101_Mainboard_Lastest_Fireware > m101_version.mainboard)
+            if(1)
+            {
+                addLog("Mainboard Lastest Ver: " + (M101_Mainboard_Lastest_Fireware / 100));
+                addLog("Mainboard Upgrade");
 
-            //第一步：发送【擦除固件】指令
-            addLog("ota_step 1: Erase firmware");
-            ota_step = 1;
-            bleSend(ota_step);
+                setTimer();
+
+                //第一步：发送【擦除固件】指令
+                m101_version.status = 3;
+                addLog("ota_step 1: Erase firmware");
+                ota_step = 1;
+                bleSend(ota_step);
+            }
 
             // setTimeout(function() {
             //     otaCharSend("00ff").then(function(character) {

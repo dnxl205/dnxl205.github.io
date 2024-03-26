@@ -429,11 +429,24 @@
                             // Mainboard更新完成
                             if(ota_step == 0x06)
                             {
-                                addLog("Disp Upgrade");
-                                addLog("Disp Lastest Ver: V" + M101_Disp_Lastest_Fireware);
+                                // Disp更新
+                                if(m101_version.disp < M101_Disp_Lastest_Fireware)
+                                {
+                                    addLog("Disp Upgrade");
+                                    addLog("Disp Lastest Ver: V" + M101_Disp_Lastest_Fireware);
 
-                                m101_version.status = 4;
-                                ajax_file("V100_TO_V101_ZH", getFirmwareArray);
+                                    m101_version.status = 4;
+                                    ajax_file("V100_TO_V101_ZH", getFirmwareArray);
+                                }
+                                // 不需要更新
+                                else
+                                {
+                                    //发送【固件结束】指令
+                                    m101_version.status = 4;
+                                    addLog("Disp Dont need Upgrade");
+                                    ota_step = 4;
+                                    bleSend(ota_step);
+                                }
                             }
                         }
                     }
@@ -858,17 +871,36 @@
         }
 
         function updateBegin() {
-            // if (firmwareSize <= 0) {
-            //     addLog("No file selected aborting");
-            //     return;
-            // }
-
             // Mainboard更新
-            addLog("Mainboard Upgrade");
-            addLog("Mainboard Lastest Ver: " + (M101_Mainboard_Lastest_Fireware / 100));
+            if(m101_version.mainboard < M101_Mainboard_Lastest_Fireware)
+            {
+                addLog("Mainboard Upgrade");
+                addLog("Mainboard Lastest Ver: " + (M101_Mainboard_Lastest_Fireware / 100));
 
-            m101_version.status = 3;
-            ajax_file(M101_Fireware_Name, getFirmwareArray);
+                m101_version.status = 3;
+                ajax_file(M101_Fireware_Name, getFirmwareArray);
+            }
+            // Disp更新
+            else if(m101_version.disp < M101_Disp_Lastest_Fireware)
+            {
+                addLog("Disp Upgrade");
+                addLog("Disp Lastest Ver: V" + M101_Disp_Lastest_Fireware);
+
+                m101_version.status = 4;
+                ajax_file("V100_TO_V101_ZH", getFirmwareArray);
+            }
+            // 无需更新
+            else
+            {
+                addLog("Not Need Upgrade");
+
+                setTimer();
+
+                //发送【固件结束】指令
+                m101_version.status = 4;
+                ota_step = 4;
+                bleSend(ota_step);
+            }
 
             // setTimeout(function() {
             //     otaCharSend("00ff").then(function(character) {
